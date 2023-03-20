@@ -1,0 +1,18 @@
+## Build
+FROM golang:1.19-alpine AS builder
+
+WORKDIR /
+
+COPY . .
+
+RUN go build
+
+## Deploy
+FROM alpine
+
+COPY --from=builder /pubsubapi /pubsubapi
+COPY --from=builder /templates /templates
+
+EXPOSE 5000
+
+ENTRYPOINT ["./pubsubapi"]

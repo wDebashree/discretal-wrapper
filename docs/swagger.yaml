@@ -1,0 +1,403 @@
+basePath: /api
+definitions:
+  models.ChannelReq:
+    properties:
+      metadata:
+        $ref: '#/definitions/models.Metadata'
+      name:
+        example: channel1
+        type: string
+    required:
+    - name
+    type: object
+  models.ChannelRes:
+    properties:
+      id:
+        example: 880d7429-8857-4e50-a7e0-698e2865b0aa
+        type: string
+      metadata:
+        $ref: '#/definitions/models.Metadata'
+      name:
+        example: channel1
+        type: string
+    type: object
+  models.ChannelsList:
+    properties:
+      channels:
+        items:
+          $ref: '#/definitions/models.ChannelRes'
+        type: array
+    type: object
+  models.LoginUserReq:
+    properties:
+      email:
+        example: user1@example.com
+        type: string
+      password:
+        example: pass@1234
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  models.LoginUserRes:
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaXNjcmV0YWwuYXV0aCIsInN1YiI6InVzZXIxQGV4YW1wbGUuY29tIiwiZXhwIjoxNjcyMDkyNDYzLCJpYXQiOjE2NzIwNTY0NjMsImlzc3Vlcl9pZCI6ImY5ZGJiZjIyLTcxZWQtNGIxZC1hZTU3LTk3ZjIxYjA4YTJiOSIsInR5cGUiOjB9.-Lcm4eWaR82W_oEVIgB24-ao6kI2NE80qR-nAiwh_c8
+        type: string
+    type: object
+  models.Metadata:
+    additionalProperties: true
+    type: object
+  models.RegisterUserReq:
+    properties:
+      email:
+        example: user1@example.com
+        type: string
+      metadata:
+        $ref: '#/definitions/models.Metadata'
+      password:
+        example: pass@1234
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  models.RegisterUserRes:
+    properties:
+      id:
+        type: string
+    required:
+    - id
+    type: object
+  models.ThingReq:
+    properties:
+      metadata:
+        $ref: '#/definitions/models.Metadata'
+      name:
+        example: device1
+        type: string
+    required:
+    - name
+    type: object
+  models.ThingRes:
+    properties:
+      id:
+        example: 8c0c7129-8857-4e50-a7e0-698e2865b0aa
+        type: string
+      key:
+        example: ef751d71-fb43-423c-a2eb-8602e6232cb4
+        type: string
+      metadata:
+        $ref: '#/definitions/models.Metadata'
+      name:
+        example: device1
+        type: string
+    type: object
+  models.ThingsList:
+    properties:
+      things:
+        items:
+          $ref: '#/definitions/models.ThingRes'
+        type: array
+    type: object
+host: localhost:5000
+info:
+  contact: {}
+  description: A wrapper api for utilizing Discretal server messaging services over
+    MQTT
+  termsOfService: http://iot.discretal.com/terms/
+  title: Discretal API
+  version: "1.0"
+paths:
+  /channels:
+    get:
+      description: Retrieves a list of channels. Due to performance concerns, data
+        is retrieved in subsets. The API things must ensure that the entire dataset
+        is consumed either by making subsequent requests, or by increasing the subset
+        size of the initial request.
+      parameters:
+      - default: 100
+        description: Size of the subset to retrieve.
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip during retrieval.
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/models.ChannelsList'
+        "400":
+          description: Failed due to malformed query parameters.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves channels
+      tags:
+      - channels
+    post:
+      description: Creates new channel. User identified by the provided access token
+        will be the channels owner.
+      parameters:
+      - description: JSON-formatted document describing the updated channel.
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ChannelReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Channel created.
+          schema:
+            $ref: '#/definitions/models.ChannelRes'
+        "400":
+          description: Failed due to malformed JSON.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Adds new channel
+      tags:
+      - channels
+  /channels/{name}:
+    delete:
+      description: Removes a channel. The service will ensure that the subscribed
+        apps and things are unsubscribed from the removed channel.
+      parameters:
+      - description: Unique channel name.
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Channel removed.
+        "400":
+          description: Failed due to malformed channel's ID.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Removes a channel
+      tags:
+      - channels
+    get:
+      description: Retrieves the details of a channel
+      parameters:
+      - description: Unique channel name.
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/models.ChannelRes'
+        "400":
+          description: Failed due to malformed channel's ID.
+        "401":
+          description: Missing or invalid access token provided.
+        "404":
+          description: Channel does not exist.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves channel info
+      tags:
+      - channels
+  /login:
+    post:
+      description: Generates an access token when provided with proper credentials.
+      parameters:
+      - description: JSON-formatted document describing the user details for login
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginUserReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User authenticated.
+          schema:
+            $ref: '#/definitions/models.LoginUserRes'
+        "400":
+          description: Failed due to malformed JSON.
+        "500":
+          description: Unexpected server-side error occurred.
+      summary: User authentication
+      tags:
+      - users
+  /register:
+    post:
+      description: Registers new user account given email and password. New account
+        will be uniquely identified by its email address.
+      parameters:
+      - description: JSON-formatted document describing the new user to be registered
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterUserReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Registered new user.
+          schema:
+            $ref: '#/definitions/models.RegisterUserRes'
+        "400":
+          description: Failed due to malformed JSON.
+        "500":
+          description: Unexpected server-side error occurred.
+      summary: Registers user account
+      tags:
+      - users
+  /things:
+    get:
+      description: Retrieves a list of things. Due to performance concerns, data is
+        retrieved in subsets. The API things must ensure that the entire dataset is
+        consumed either by making subsequent requests, or by increasing the subset
+        size of the initial request.
+      parameters:
+      - default: 100
+        description: Size of the subset to retrieve.
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip during retrieval.
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/models.ThingsList'
+        "400":
+          description: Failed due to malformed query parameters.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves things
+      tags:
+      - things
+    post:
+      description: Adds new thing to the list of things owned by user identified using
+        the provided access token.
+      parameters:
+      - description: JSON-formatted document describing the new thing.
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ThingReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Thing registered.
+          schema:
+            $ref: '#/definitions/models.ThingRes'
+        "400":
+          description: Failed due to malformed JSON.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Adds new thing
+      tags:
+      - things
+  /things/{name}:
+    delete:
+      description: Removes a thing. The service will ensure that the removed thing
+        is disconnected from all of the existing channels.
+      parameters:
+      - description: Unique thing name.
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Thing removed.
+        "400":
+          description: Failed due to malformed thing's ID.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Removes a thing
+      tags:
+      - things
+    get:
+      description: Retrieves the details of a thing
+      parameters:
+      - description: Unique thing name.
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/models.ThingRes'
+        "400":
+          description: Failed due to malformed thing's ID.
+        "401":
+          description: Missing or invalid access token provided.
+        "404":
+          description: Thing does not exist.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves thing info
+      tags:
+      - things
+schemes:
+- http
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
