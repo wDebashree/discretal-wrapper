@@ -23,5 +23,5 @@ func main() {
 	router := gin.New()
 	router.Use(gin.LoggerWithFormatter(logger.LoggingMiddleware))
 	routers.BuildRoutes(router)
-	router.Run("0.0.0.0:5001")
+	router.Run("0.0.0.0:5000")
 }
