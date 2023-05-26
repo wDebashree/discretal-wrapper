@@ -1,3 +1,4 @@
+// Default formatter
 {
     "editor.defaultFormatter": "golang.go"
 }
