@@ -80,7 +80,7 @@ func LoginUser(c *gin.Context) {
 	url := env.Env(envThingURL, sdkThingURL)
 	urlChan := url + "/channels"
 
-	channels, _, err := findChannels(c, urlChan)
+	channels, _, err := findChannels(c, urlChan, nil)
 	if err != nil {
 		errors.ErrHandler(c, fmt.Errorf("error occurred in channels lookup : %v", err), http.StatusNotFound)
 		return
@@ -141,7 +141,7 @@ func LoginUser(c *gin.Context) {
 	// checking for things
 	// configure the sdk payload for forwarding request
 	urlThing := url + "/things"
-	things, _, err := findThings(c, urlThing)
+	things, _, err := findThings(c, urlThing, nil)
 	if err != nil {
 		errors.ErrHandler(c, fmt.Errorf("error occurred in channels lookup : %v", err), http.StatusNotFound)
 		return
@@ -155,8 +155,12 @@ func LoginUser(c *gin.Context) {
 		}
 	}
 	if !found {
+		mapcoords := make(map[string]interface{})
+		mapcoords["latitude"] = 0
+		mapcoords["longitude"] = 0
 		tngData := models.ThingReq{
-			Name: "cloudEnd",
+			Name:        "cloudEnd",
+			Coordinates: mapcoords,
 		}
 		thingdata, _ := json.Marshal(tngData)
 		newreq, err := http.NewRequest("POST", urlThing, bytes.NewBuffer(thingdata))
@@ -181,7 +185,12 @@ func LoginUser(c *gin.Context) {
 		}
 		fmt.Println("id:- ", id)
 
-		errcode, err := connect(c, id, "")
+		// user, err := GetUser(fmt.Sprintf("Bearer %s", loginToken.Token))
+		// if err != nil {
+		// 	errors.ErrHandler(c, fmt.Errorf("error occurred in connecting with things : %v", err), http.StatusBadRequest)
+		// }
+
+		errcode, err := connect(c, id, "", user.Email)
 		if err != nil {
 			if errcode > 0 {
 				errors.ErrHandler(c, fmt.Errorf("error occurred in connecting with default channels : %v", err), errcode)

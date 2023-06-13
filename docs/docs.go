@@ -35,16 +35,44 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "default": 100,
                         "description": "Size of the subset to retrieve.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "default": 0,
                         "description": "Number of items to skip during retrieval.",
                         "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Unique channel name.",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entity to be sorted on.",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Asc or Desc sorting.",
+                        "name": "dir",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Disconnected true or false.",
+                        "name": "disconnected",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Email ID of selected user.",
+                        "name": "email",
                         "in": "query"
                     }
                 ],
@@ -110,7 +138,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/channels/{name}": {
+        "/channels/{id}": {
             "get": {
                 "security": [
                     {
@@ -128,8 +156,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Unique channel name.",
-                        "name": "name",
+                        "description": "Unique channel id.",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     }
@@ -161,32 +189,518 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Removes a channel. The service will ensure that the subscribed apps and things are unsubscribed from the removed channel.",
+                "description": "Removes a group. The service will ensure that the subscribed group relation is deleted as well.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "channels"
+                    "groups"
                 ],
-                "summary": "Removes a channel",
+                "summary": "Removes a group",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Unique channel name.",
-                        "name": "name",
+                        "description": "Unique group id.",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     }
                 ],
                 "responses": {
                     "204": {
-                        "description": "Channel removed."
+                        "description": "Group removed."
                     },
                     "400": {
-                        "description": "Failed due to malformed channel's ID."
+                        "description": "Failed due to malformed group's ID."
                     },
                     "401": {
                         "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            }
+        },
+        "/channels/{id}/messages": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves messages passed over a channel.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Retrieves messages passed over a channel.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique channel id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size of the subset to retrieve.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items to skip during retrieval.",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Select the messages based on the set publisher.",
+                        "name": "publisher",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Select the messages based on the set protocol.",
+                        "name": "protocol",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Select the messages based on the set name.",
+                        "name": "name",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data retrieved.",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.GetMessages.ResMessages"
+                        }
+                    },
+                    "400": {
+                        "description": "Failed due to malformed query parameters."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends messages over a channel.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Sends messages over a channel.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique channel id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "JSON-formatted document describing the messages.",
+                        "name": "Request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.SendMessages.Msg"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Messages sent."
+                    },
+                    "400": {
+                        "description": "Failed due to malformed query parameters."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            }
+        },
+        "/channels/{id}/things": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of things that are connected to the channel. Due to performance concerns, data is retrieved in subsets.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "channels"
+                ],
+                "summary": "Retrieves connected things",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique channel id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size of the subset to retrieve.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items to skip during retrieval.",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entity to be sorted on.",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Asc or Desc sorting.",
+                        "name": "dir",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Disconnected true or false.",
+                        "name": "disconnected",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data retrieved.",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.GetConnectedThings.ConnThings"
+                        }
+                    },
+                    "400": {
+                        "description": "Failed due to malformed query parameters."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            }
+        },
+        "/groups": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of groups. Due to performance concerns, data is retrieved in subsets. The API things must ensure that the entire dataset is consumed either by making subsequent requests, or by increasing the subset size of the initial request.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Retrieves groups",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Size of the subset to retrieve.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items to skip during retrieval.",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data retrieved.",
+                        "schema": {
+                            "$ref": "#/definitions/models.GroupPageRes"
+                        }
+                    },
+                    "400": {
+                        "description": "Failed due to malformed query parameters."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds new group that will be owned by user identified using the provided access token.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Adds new group",
+                "parameters": [
+                    {
+                        "description": "JSON-formatted document describing the new group.",
+                        "name": "Request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.GroupReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Group created.",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.CreateGroup.Resp"
+                        }
+                    },
+                    "400": {
+                        "description": "Failed due to malformed JSON."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            }
+        },
+        "/groups/{groupID}/members": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of members which belong to the group.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Retrieves connected members",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique thing id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size of the subset to retrieve.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items to skip during retrieval.",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Member is of type users or things.",
+                        "name": "type",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data retrieved.",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.GetMembers.memberPageRes"
+                        }
+                    },
+                    "400": {
+                        "description": "Failed due to malformed query parameters."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Assign one or more things to the group.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Assign one or more things to the group.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique group id.",
+                        "name": "groupID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "JSON-formatted document describing group IDs.",
+                        "name": "Request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.AssignReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Member(s) assigned."
+                    },
+                    "400": {
+                        "description": "Failed due to malformed JSON."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove one or more things from the group.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Remove one or more things from the group.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique group id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "JSON-formatted document describing group IDs.",
+                        "name": "Request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.AssignReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Group(s) unassigned."
+                    },
+                    "400": {
+                        "description": "Failed due to malformed JSON."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            }
+        },
+        "/groups/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves the details of a group",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Retrieves group info",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique group id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data retrieved.",
+                        "schema": {
+                            "$ref": "#/definitions/models.GroupRes"
+                        }
+                    },
+                    "400": {
+                        "description": "Failed due to malformed group's ID."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "404": {
+                        "description": "Group does not exist."
                     },
                     "500": {
                         "description": "Unexpected server-side error occurred."
@@ -286,16 +800,50 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "default": 100,
                         "description": "Size of the subset to retrieve.",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "default": 0,
                         "description": "Number of items to skip during retrieval.",
                         "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Unique thing name.",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entity to be sorted on.",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Asc or Desc sorting.",
+                        "name": "dir",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Disconnected true or false.",
+                        "name": "disconnected",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Email ID of selected user.",
+                        "name": "email",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "description": "Array of group IDs.",
+                        "name": "gids",
                         "in": "query"
                     }
                 ],
@@ -303,7 +851,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Data retrieved.",
                         "schema": {
-                            "$ref": "#/definitions/models.ThingsList"
+                            "$ref": "#/definitions/models.ThingsPageRes"
                         }
                     },
                     "400": {
@@ -361,7 +909,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/things/{name}": {
+        "/things/{id}": {
             "get": {
                 "security": [
                     {
@@ -379,8 +927,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Unique thing name.",
-                        "name": "name",
+                        "description": "Unique thing id.",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     }
@@ -391,6 +939,56 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/models.ThingRes"
                         }
+                    },
+                    "400": {
+                        "description": "Failed due to malformed thing's ID."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "404": {
+                        "description": "Thing does not exist."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the details of a thing",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "things"
+                ],
+                "summary": "Updates thing info",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique thing id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "JSON-formatted document describing the updated thing.",
+                        "name": "Request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ThingReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Thing updated."
                     },
                     "400": {
                         "description": "Failed due to malformed thing's ID."
@@ -423,8 +1021,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Unique thing name.",
-                        "name": "name",
+                        "description": "Unique thing id.",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     }
@@ -444,9 +1042,426 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/things/{id}/channels": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of channels that are connected to the thing. Due to performance concerns, data is retrieved in subsets.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "things"
+                ],
+                "summary": "Retrieves connected channels",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique thing id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size of the subset to retrieve.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items to skip during retrieval.",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entity to be sorted on.",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Asc or Desc sorting.",
+                        "name": "dir",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Disconnected true or false.",
+                        "name": "disconnected",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data retrieved.",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.GetConnectedChannels.ConnChannels"
+                        }
+                    },
+                    "400": {
+                        "description": "Failed due to malformed query parameters."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            }
+        },
+        "/things/{id}/groups": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of groups to which the thing is a member.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "things"
+                ],
+                "summary": "Retrieves connected groups",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique thing id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Size of the subset to retrieve.",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items to skip during retrieval.",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entity to be sorted on.",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Asc or Desc sorting.",
+                        "name": "dir",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Disconnected true or false.",
+                        "name": "disconnected",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data retrieved.",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.GetConnectedGroups.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Failed due to malformed query parameters."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Assign thing to one or more groups.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "things"
+                ],
+                "summary": "Assign thing to one or more groups",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique thing id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "JSON-formatted document describing group IDs.",
+                        "name": "Request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.AssignGroupReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Group(s) assigned."
+                    },
+                    "400": {
+                        "description": "Failed due to malformed JSON."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Unassign thing from one or more groups.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "things"
+                ],
+                "summary": "Unassign thing from one or more groups",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique thing id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "JSON-formatted document describing group IDs.",
+                        "name": "Request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.AssignGroupReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Group(s) unassigned."
+                    },
+                    "400": {
+                        "description": "Failed due to malformed JSON."
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token provided."
+                    },
+                    "500": {
+                        "description": "Unexpected server-side error occurred."
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "controllers.CreateGroup.Resp": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.GetConnectedChannels.ConnChannels": {
+            "type": "object",
+            "properties": {
+                "channels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ChannelRes"
+                    }
+                },
+                "direction": {
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "order": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "controllers.GetConnectedGroups.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ViewGroupRes"
+                    }
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "controllers.GetConnectedThings.ConnThings": {
+            "type": "object",
+            "properties": {
+                "direction": {
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "order": {
+                    "type": "string"
+                },
+                "things": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ThingRes"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "controllers.GetMembers.memberPageRes": {
+            "type": "object",
+            "properties": {
+                "level": {
+                    "type": "integer"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.GetMessages.ResMessages": {
+            "type": "object",
+            "properties": {
+                "format": {
+                    "description": "Subtopic    string    ` + "`" + `json:\"subtopic,omitempty\"` + "`" + `\nPublisher   string    ` + "`" + `json:\"publisher,omitempty\"` + "`" + `\nProtocol    string    ` + "`" + `json:\"protocol,omitempty\"` + "`" + `\nName        string    ` + "`" + `json:\"name,omitempty\"` + "`" + `\nValue       float64   ` + "`" + `json:\"v,omitempty\"` + "`" + `\nComparator  string    ` + "`" + `json:\"comparator,omitempty\"` + "`" + `\nBoolValue   bool      ` + "`" + `json:\"vb,omitempty\"` + "`" + `\nStringValue string    ` + "`" + `json:\"vs,omitempty\"` + "`" + `\nDataValue   string    ` + "`" + `json:\"vd,omitempty\"` + "`" + `\nFrom        float64   ` + "`" + `json:\"from,omitempty\"` + "`" + `\nTo          float64   ` + "`" + `json:\"to,omitempty\"` + "`" + `",
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "messages": {
+                    "type": "array",
+                    "items": {}
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "controllers.SendMessages.Msg": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "models.AssignGroupReq": {
+            "type": "object",
+            "required": [
+                "groups"
+            ],
+            "properties": {
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "description": "Type   string   ` + "`" + `json:\"type,omitempty\" binding:\"required\"` + "`" + `",
+                    "type": "string"
+                }
+            }
+        },
+        "models.AssignReq": {
+            "type": "object",
+            "required": [
+                "members",
+                "type"
+            ],
+            "properties": {
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "models.ChannelReq": {
             "type": "object",
             "required": [
@@ -478,14 +1493,123 @@ const docTemplate = `{
                 }
             }
         },
+        "models.ChannelResAll": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "880d7429-8857-4e50-a7e0-698e2865b0aa"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/models.Metadata"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "channel1"
+                },
+                "owner": {
+                    "type": "string",
+                    "example": "user@example.com"
+                }
+            }
+        },
         "models.ChannelsList": {
             "type": "object",
             "properties": {
                 "channels": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.ChannelRes"
+                        "$ref": "#/definitions/models.ChannelResAll"
                     }
+                }
+            }
+        },
+        "models.GroupPageRes": {
+            "type": "object",
+            "properties": {
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.GroupRes"
+                    }
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.GroupReq": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "group1"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/models.Metadata"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "group1"
+                }
+            }
+        },
+        "models.GroupRes": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.GroupRes"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "level": {
+                    "description": "Indicates a level in tree hierarchy from first group node - root.",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "string"
+                },
+                "path": {
+                    "description": "Path in a tree consisting of group ids\nparentID1.parentID2.childID1\ne.g. 01EXPM5Z8HRGFAEWTETR1X1441.01EXPKW2TVK74S5NWQ979VJ4PJ.01EXPKW2TVK74S5NWQ979VJ4PJ",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -523,6 +1647,8 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "email",
+                "firstName",
+                "lastName",
                 "password"
             ],
             "properties": {
@@ -530,8 +1656,13 @@ const docTemplate = `{
                     "type": "string",
                     "example": "user1@example.com"
                 },
-                "metadata": {
-                    "$ref": "#/definitions/models.Metadata"
+                "firstName": {
+                    "type": "string",
+                    "example": "John Doe"
+                },
+                "lastName": {
+                    "type": "string",
+                    "example": "John Doe"
                 },
                 "password": {
                     "type": "string",
@@ -556,6 +1687,10 @@ const docTemplate = `{
                 "name"
             ],
             "properties": {
+                "coordinates": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
                 "metadata": {
                     "$ref": "#/definitions/models.Metadata"
                 },
@@ -585,14 +1720,73 @@ const docTemplate = `{
                 }
             }
         },
-        "models.ThingsList": {
+        "models.ThingResAll": {
             "type": "object",
             "properties": {
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string",
+                    "example": "8c0c7129-8857-4e50-a7e0-698e2865b0aa"
+                },
+                "key": {
+                    "type": "string",
+                    "example": "ef751d71-fb43-423c-a2eb-8602e6232cb4"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/models.Metadata"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "device1"
+                },
+                "owner": {
+                    "type": "string",
+                    "example": "user@example.com"
+                }
+            }
+        },
+        "models.ThingsPageRes": {
+            "type": "object",
+            "properties": {
+                "dir": {
+                    "type": "string"
+                },
+                "isadmin": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "order": {
+                    "type": "string"
+                },
                 "things": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.ThingRes"
+                        "$ref": "#/definitions/models.ThingResAll"
                     }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.ViewGroupRes": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         }
@@ -609,9 +1803,9 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:5000",
+	Host:             "iot.discretal.com",
 	BasePath:         "/api",
-	Schemes:          []string{"http"},
+	Schemes:          []string{"https"},
 	Title:            "Discretal API",
 	Description:      "A wrapper api for utilizing Discretal server messaging services over MQTT",
 	InfoInstanceName: "swagger",

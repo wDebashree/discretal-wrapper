@@ -1,22 +1,18 @@
 package controllers
 
 import (
-	// "encoding/json"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
 
-	// "github.com/eclipse/paho.mqtt.golang"
-	"github.com/gin-gonic/gin"
-	// sdk "github.com/mainflux/mainflux/pkg/sdk/go"
-
-	// "io"
 	"net/http"
 	"pubsubapi/env"
 	"pubsubapi/errors"
 	"pubsubapi/models"
+
+	"github.com/gin-gonic/gin"
 )
 
 // CreateThing	godoc
@@ -36,13 +32,6 @@ import (
 //
 //	@Router			/things [post]
 func CreateThing(c *gin.Context) {
-	// check if auth token exists
-	token, err := getToken(c)
-	if err != nil {
-		errors.ErrHandler(c, err, http.StatusUnauthorized)
-		return
-	}
-
 	// to test whether CreateThing requirements are met or not
 	var testThing models.ThingReq
 	if err := c.ShouldBindJSON(&testThing); err != nil {
@@ -50,18 +39,13 @@ func CreateThing(c *gin.Context) {
 		return
 	}
 
-	// configure the sdk payload for forwarding request
 	url := env.Env(envThingURL, sdkThingURL)
 	url = url + "/things"
 
-	// To check whether channelname already exists or not
-	thingsList, errcode, err := findThings(c, url)
+	// To check whether thingname already exists or not
+	thingsList, errcode, err := findThings(c, url, nil)
 	if err != nil {
-		if errcode > 0 {
-			errors.ErrHandler(c, fmt.Errorf("error occurred while checking naming conflict : %v", err), errcode)
-		} else {
-			errors.ErrHandler(c, fmt.Errorf("error occurred while checking naming conflict : %v", err), http.StatusBadRequest)
-		}
+		errcodeHandler(c, "error occurred while checking naming conflict", errcode, err)
 		return
 	}
 
@@ -72,49 +56,17 @@ func CreateThing(c *gin.Context) {
 			break
 		}
 	}
-
 	if thing.ID != "" {
 		errors.InfoHandler(c, "thing name already exists", thing, http.StatusAlreadyReported)
 		return
 	}
 
+	// If thingname does not exist, send request to add it
 	thingdata, _ := json.Marshal(testThing)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(thingdata))
+	resp, err := httpReq(c, "POST", url, thingdata, nil)
 	if err != nil {
 		errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
 		return
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", token)
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
-	}
-	defer resp.Body.Close()
-	id := strings.TrimPrefix(resp.Header.Get("Location"), fmt.Sprintf("/%s/", "things"))
-
-	errcode, err = connect(c, id, "")
-	if err != nil {
-		if errcode > 0 {
-			errors.ErrHandler(c, fmt.Errorf("error occurred in connecting with channels : %v", err), errcode)
-		} else {
-			errors.ErrHandler(c, fmt.Errorf("error occurred in connecting with channels : %v", err), http.StatusBadRequest)
-		}
-		return
-	}
-
-	req, err = http.NewRequest("GET", url+"/"+id, nil)
-	if err != nil {
-		errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
-		return
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", token)
-	client = &http.Client{}
-	resp, err = client.Do(req)
-	if err != nil {
-		errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
 	}
 	defer resp.Body.Close()
 
@@ -124,14 +76,49 @@ func CreateThing(c *gin.Context) {
 		return
 	}
 
-	var thingresp models.ThingRes
-	err = json.Unmarshal(data, &thingresp)
-	if err != nil {
-		errors.ErrHandler(c, fmt.Errorf("error occurred while unmarshalling response : %v", err), http.StatusBadRequest)
+	var resperr models.RespError
+	_ = json.Unmarshal(data, &resperr)
+	if resperr.Error != "" {
+		errors.InfoHandler(c, "thing creation completed"+withOutput(resperr.Error), resperr, resp.StatusCode)
 		return
 	}
 
-	errors.InfoHandler(c, "thing created successfully", thingresp, http.StatusCreated)
+	// Get the new thing ID along with user details to connect with channels
+	id := strings.TrimPrefix(resp.Header.Get("Location"), fmt.Sprintf("/%s/", "things"))
+	user, err := getUser(c)
+	if err != nil {
+		errors.ErrHandler(c, fmt.Errorf("error occurred in connecting with things : %v", err), http.StatusBadRequest)
+	}
+
+	// connect new thing to all existing channels
+	errcode, err = connect(c, id, "", user.Email)
+	if err != nil {
+		errcodeHandler(c, "error occurred in connecting with channels", errcode, err)
+		return
+	}
+
+	// get the newly created id details
+	resp, err = httpReq(c, "GET", url+"/"+id, nil, nil)
+	if err != nil {
+		errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	data, err = io.ReadAll(resp.Body)
+	if err != nil {
+		errors.ErrHandler(c, fmt.Errorf("error occurred while reading response : %v", err), http.StatusBadRequest)
+		return
+	}
+
+	type Response struct {
+		*models.ThingRes `json:",omitempty"`
+		Error            string `json:"error,omitempty"`
+	}
+	var response Response
+	_ = json.Unmarshal(data, &response)
+
+	errors.InfoHandler(c, "thing creation completed"+withOutput(response.Error), response, resp.StatusCode)
 }
 
 // GetThings	godoc
@@ -141,9 +128,16 @@ func CreateThing(c *gin.Context) {
 //	@Tags			things
 //	@Produce		json
 //
-//	@Param			thingsParams	query		controllers.GetThings.ThingsParams	false	"thingsParams"
+//	@Param			limit			query		integer					false	"Size of the subset to retrieve."
+//	@Param			offset			query		integer					false	"Number of items to skip during retrieval."
+//	@Param			name			query		string					false	"Unique thing name."
+//	@Param			order			query		string					false	"Entity to be sorted on."
+//	@Param			dir				query		string					false	"Asc or Desc sorting."
+//	@Param			disconnected	query		bool					false	"Disconnected true or false."
+//	@Param			email			query		string					false	"Email ID of selected user."
+//	@Param			gids			query		array					false	"Array of group IDs."
 //
-//	@Success		200				{object}	models.ThingsList					"Data retrieved."
+//	@Success		200				{object}	models.ThingsPageRes	"Data retrieved."
 //	@Failure		400				"Failed due to malformed query parameters."
 //	@Failure		401				"Missing or invalid access token provided."
 //	@Failure		500				"Unexpected server-side error occurred."
@@ -152,62 +146,106 @@ func CreateThing(c *gin.Context) {
 //
 //	@Router			/things [get]
 func GetThings(c *gin.Context) {
-	// check if auth token exists
-	token, err := getToken(c)
-	if err != nil {
-		errors.ErrHandler(c, err, http.StatusUnauthorized)
-		return
-	}
+	var data []byte
+	params := make(map[string]string)
 
-	url := env.Env(envThingURL, sdkThingURL)
-	req, err := http.NewRequest("GET", url+"/things", nil)
-	if err != nil {
-		errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
-		return
-	}
-	req.Header.Set("Authorization", token)
-	req.Header.Set("Content-Type", "application/json")
+	var ids []string
+	if gids, ok := c.GetQuery("gids"); ok {
+		ids = strings.Split(gids, ",")
 
-	//add query parameters
-	q := req.URL.Query()
-	// params := []string{"offset", "limit", "disconnected", "order", "dir"}
-	params := []string{"offset", "limit", "disconnected", "order", "dir", "name"}
-	for _, prms := range params {
-		val, ok := c.GetQuery(prms)
-		if ok {
-			q.Add(prms, val)
+		// if groupname, ok := c.GetQuery("grpname"); ok {
+		// 	urlGroup := env.Env(envGroupURL, sdkGroupURL)
+		// 	urlGroup = urlGroup + "/groups"
+
+		// 	params["name"] = groupname
+
+		// 	resp, err := httpReq(c, "GET", urlGroup, nil, params)
+		// 	if err != nil {
+		// 		errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
+		// 		return
+		// 	}
+		// 	defer resp.Body.Close()
+
+		// 	data, err = io.ReadAll(resp.Body)
+		// 	if err != nil {
+		// 		errors.ErrHandler(c, fmt.Errorf("error occurred while reading response : %v", err), http.StatusBadRequest)
+		// 		return
+		// 	}
+
+		// 	var allGroups models.GroupPageRes
+		// 	err = json.Unmarshal(data, &allGroups)
+		// 	if err != nil {
+		// 		errors.ErrHandler(c, fmt.Errorf("error occurred while unmarshalling response : %v", err), http.StatusBadRequest)
+		// 		return
+		// 	}
+
+		// 	// var ids []string
+		// 	for _, gp := range allGroups.Groups {
+		// 		ids = append(ids, gp.ID)
+		// 	}
+		// }
+
+		var payload = models.GroupIDs{
+			IDs: ids,
 		}
-	}
-	req.URL.RawQuery = q.Encode()
+		groupdata, _ := json.Marshal(payload)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
-	}
-	defer resp.Body.Close()
+		urlThings := env.Env(envThingURL, sdkThingURL)
+		urlThings = urlThings + "/groups"
 
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		errors.ErrHandler(c, fmt.Errorf("error occurred while reading response : %v", err), http.StatusBadRequest)
-		return
+		// delete(params, "name") // deleting the groupname passed in previous endpoint, in order to reuse the same map table
+
+		paramarr := []string{"limit", "offset", "name", "order", "dir"}
+		for _, prms := range paramarr {
+			val, ok := c.GetQuery(prms)
+			if ok {
+				params[prms] = val
+			}
+		}
+
+		newresp, err := httpReq(c, "GET", urlThings, groupdata, params)
+		if err != nil {
+			errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		data, err = io.ReadAll(newresp.Body)
+		if err != nil {
+			errors.ErrHandler(c, fmt.Errorf("error occurred while reading response : %v", err), http.StatusBadRequest)
+			return
+		}
+		defer newresp.Body.Close()
+
+	} else {
+		url := env.Env(envThingURL, sdkThingURL)
+		url = url + "/things"
+
+		// delete(params, "name") // deleting the groupname passed in previous endpoint, in order to reuse the same map table
+
+		paramarr := []string{"offset", "limit", "disconnected", "order", "dir", "email", "name"}
+		for _, prms := range paramarr {
+			val, ok := c.GetQuery(prms)
+			if ok {
+				params[prms] = val
+			}
+		}
+
+		resp, err := httpReq(c, "GET", url, nil, params)
+		if err != nil {
+			errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		data, err = io.ReadAll(resp.Body)
+		if err != nil {
+			errors.ErrHandler(c, fmt.Errorf("error occurred while reading response : %v", err), http.StatusBadRequest)
+			return
+		}
+		defer resp.Body.Close()
 	}
 
-	type pageRes struct {
-		Total     uint64 `json:"total"`
-		Offset    uint64 `json:"offset"`
-		Limit     uint64 `json:"limit"`
-		Order     string `json:"order,omitempty"`
-		Direction string `json:"dir,omitempty"`
-		IsAdmin   bool   `json:"isadmin,omitempty"`
-	}
-	type thingsPageRes struct {
-		pageRes
-		Things []models.ThingResAll `json:"things"`
-	}
-
-	var allThings thingsPageRes
-	err = json.Unmarshal(data, &allThings)
+	var allThings models.ThingsPageRes
+	err := json.Unmarshal(data, &allThings)
 	if err != nil {
 		errors.ErrHandler(c, fmt.Errorf("error occurred while unmarshalling response : %v", err), http.StatusBadRequest)
 		return
@@ -223,17 +261,17 @@ func GetThings(c *gin.Context) {
 //	@Tags			things
 //	@Produce		json
 //
-//	@Param			name	path		string			true	"Unique thing name."
+//	@Param			id	path		string			true	"Unique thing id."
 //
-//	@Success		200		{object}	models.ThingRes	"Data retrieved."
-//	@Failure		400		"Failed due to malformed thing's ID."
-//	@Failure		404		"Thing does not exist."
-//	@Failure		401		"Missing or invalid access token provided."
-//	@Failure		500		"Unexpected server-side error occurred."
+//	@Success		200	{object}	models.ThingRes	"Data retrieved."
+//	@Failure		400	"Failed due to malformed thing's ID."
+//	@Failure		404	"Thing does not exist."
+//	@Failure		401	"Missing or invalid access token provided."
+//	@Failure		500	"Unexpected server-side error occurred."
 //
 //	@Security		BearerAuth
 //
-//	@Router			/things/{name} [get]
+//	@Router			/things/{id} [get]
 func GetThing(c *gin.Context) {
 	// check if auth token exists
 	token, err := getToken(c)
@@ -287,6 +325,25 @@ func GetThing(c *gin.Context) {
 	errors.InfoHandler(c, "thing retrieved successfully", thingres, http.StatusOK)
 }
 
+// UpdateThing	godoc
+//
+//	@Summary		Updates thing info
+//	@Description	Updates the details of a thing
+//	@Tags			things
+//	@Produce		json
+//
+//	@Param			id		path	string			true	"Unique thing id."
+//	@Param			Request	body	models.ThingReq	true	"JSON-formatted document describing the updated thing."
+//
+//	@Success		200		"Thing updated."
+//	@Failure		400		"Failed due to malformed thing's ID."
+//	@Failure		404		"Thing does not exist."
+//	@Failure		401		"Missing or invalid access token provided."
+//	@Failure		500		"Unexpected server-side error occurred."
+//
+//	@Security		BearerAuth
+//
+//	@Router			/things/{id} [put]
 func UpdateThing(c *gin.Context) {
 	// check if auth token exists
 	token, err := getToken(c)
@@ -343,16 +400,16 @@ func UpdateThing(c *gin.Context) {
 //	@Tags			things
 //	@Produce		json
 //
-//	@Param			name	path	string	true	"Unique thing name."
+//	@Param			id	path	string	true	"Unique thing id."
 //
-//	@Success		204		"Thing removed."
-//	@Failure		400		"Failed due to malformed thing's ID."
-//	@Failure		401		"Missing or invalid access token provided."
-//	@Failure		500		"Unexpected server-side error occurred."
+//	@Success		204	"Thing removed."
+//	@Failure		400	"Failed due to malformed thing's ID."
+//	@Failure		401	"Missing or invalid access token provided."
+//	@Failure		500	"Unexpected server-side error occurred."
 //
 //	@Security		BearerAuth
 //
-//	@Router			/things/{name} [delete]
+//	@Router			/things/{id} [delete]
 func DeleteThing(c *gin.Context) {
 	// check if auth token exists
 	token, err := getToken(c)
@@ -424,9 +481,42 @@ func DeleteThing(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
-	errors.InfoHandler(c, "thing deleted successfully", "thing deleted successfully", http.StatusNoContent)
+	data, _ = io.ReadAll(resp.Body)
+
+	var response models.RespError
+	_ = json.Unmarshal(data, &response)
+
+	var withOutput string
+	if response.Error != "" {
+		withOutput = " with errors - " + response.Error
+	} else {
+		withOutput = " without errors."
+	}
+	errors.InfoHandler(c, "thing deletion operation completed"+withOutput, response, resp.StatusCode)
 }
 
+// GetConnectedChannels	godoc
+//
+//	@Summary		Retrieves connected channels
+//	@Description	Retrieves a list of channels that are connected to the thing. Due to performance concerns, data is retrieved in subsets.
+//	@Tags			things
+//	@Produce		json
+//
+//	@Param			id				path		string											true	"Unique thing id."
+//	@Param			limit			query		integer											false	"Size of the subset to retrieve."
+//	@Param			offset			query		integer											false	"Number of items to skip during retrieval."
+//	@Param			order			query		string											false	"Entity to be sorted on."
+//	@Param			dir				query		string											false	"Asc or Desc sorting."
+//	@Param			disconnected	query		bool											false	"Disconnected true or false."
+//
+//	@Success		200				{object}	controllers.GetConnectedChannels.ConnChannels	"Data retrieved."
+//	@Failure		400				"Failed due to malformed query parameters."
+//	@Failure		401				"Missing or invalid access token provided."
+//	@Failure		500				"Unexpected server-side error occurred."
+//
+//	@Security		BearerAuth
+//
+//	@Router			/things/{id}/channels [get]
 func GetConnectedChannels(c *gin.Context) {
 	// check if auth token exists
 	token, err := getToken(c)
@@ -516,6 +606,28 @@ func GetConnectedChannels(c *gin.Context) {
 	errors.InfoHandler(c, "connected things retrieved successfully", connchannels, http.StatusOK)
 }
 
+// GetConnectedGroups	godoc
+//
+//	@Summary		Retrieves connected groups
+//	@Description	Retrieves a list of groups to which the thing is a member.
+//	@Tags			things
+//	@Produce		json
+//
+//	@Param			id				path		string											true	"Unique thing id."
+//	@Param			limit			query		integer											false	"Size of the subset to retrieve."
+//	@Param			offset			query		integer											false	"Number of items to skip during retrieval."
+//	@Param			order			query		string											false	"Entity to be sorted on."
+//	@Param			dir				query		string											false	"Asc or Desc sorting."
+//	@Param			disconnected	query		bool											false	"Disconnected true or false."
+//
+//	@Success		200				{object}	controllers.GetConnectedGroups.SuccessResponse	"Data retrieved."
+//	@Failure		400				"Failed due to malformed query parameters."
+//	@Failure		401				"Missing or invalid access token provided."
+//	@Failure		500				"Unexpected server-side error occurred."
+//
+//	@Security		BearerAuth
+//
+//	@Router			/things/{id}/groups [get]
 func GetConnectedGroups(c *gin.Context) {
 	// check if auth token exists
 	token, err := getToken(c)
@@ -567,23 +679,16 @@ func GetConnectedGroups(c *gin.Context) {
 		return
 	}
 
-	type viewGroupRes struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+	type SuccessResponse struct {
+		models.GrpPageRes
+		Groups []models.ViewGroupRes `json:"groups"`
 	}
-	type pageRes struct {
-		Limit  uint64 `json:"limit,omitempty"`
-		Offset uint64 `json:"offset,omitempty"`
-		Total  uint64 `json:"total"`
-		Level  uint64 `json:"level"`
-		Name   string `json:"name"`
-	}
-	type groupPageRes struct {
-		pageRes
-		Groups []viewGroupRes `json:"groups"`
+	type Response struct {
+		*SuccessResponse `json:",omitempty"`
+		Error            string `json:"error,omitempty"`
 	}
 
-	var conngroups groupPageRes
+	var conngroups Response
 	err = json.Unmarshal(data, &conngroups)
 	if err != nil {
 		errors.ErrHandler(c, fmt.Errorf("error occurred while unmarshalling response : %v", err), http.StatusBadRequest)
@@ -593,6 +698,24 @@ func GetConnectedGroups(c *gin.Context) {
 	errors.InfoHandler(c, "connected groups retrieved successfully", conngroups, http.StatusOK)
 }
 
+// AssignGroups	godoc
+//
+//	@Summary		Assign thing to one or more groups
+//	@Description	Assign thing to one or more groups.
+//	@Tags			things
+//	@Produce		json
+//
+//	@Param			id		path	string					true	"Unique thing id."
+//	@Param			Request	body	models.AssignGroupReq	true	"JSON-formatted document describing group IDs."
+//
+//	@Success		201		"Group(s) assigned."
+//	@Failure		400		"Failed due to malformed JSON."
+//	@Failure		401		"Missing or invalid access token provided."
+//	@Failure		500		"Unexpected server-side error occurred."
+//
+//	@Security		BearerAuth
+//
+//	@Router			/things/{id}/groups [post]
 func AssignGroups(c *gin.Context) {
 	path := strings.SplitAfter(c.Request.URL.Path, "/api/")
 	grouptype := strings.Split(path[1], "/")[0]
@@ -635,45 +758,42 @@ func AssignGroups(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
-	// data, _ := io.ReadAll(resp.Body)
-	// fmt.Println("data --> ", string(data))
-
-	if (resp.StatusCode != 200) && (resp.StatusCode != 204) {
-		fmt.Println()
-		errors.ErrHandler(c, fmt.Errorf(`group could not be added to the member`), http.StatusBadRequest)
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		errors.ErrHandler(c, fmt.Errorf("error occurred while reading response : %v", err), http.StatusBadRequest)
 		return
 	}
+	var response models.RespError
+	_ = json.Unmarshal(data, &response)
 
-	// var updateURL string
-	// if groups.Type == "things" {
-	// 	updateURL = env.Env(envThingURL, sdkThingURL)
-	// 	updateURL = updateURL + "/things/" + Item.Id
-	// } else if groups.Type == "users" {
-	// 	updateURL = env.Env(envUserURL, sdkUserURL)
-	// 	updateURL = updateURL + "/users/" + Item.Id
-	// }
+	var withOutput string
+	if response.Error != "" {
+		withOutput = " with errors - " + response.Error
+	} else {
+		withOutput = " without errors."
+	}
 
-	// var updatemember models.ThingReq
-	// updatemember.Metadata = make(map[string]interface{}, 1)
-	// updatemember.Metadata["addgroup"] = groups.Groups
-	// addmemberdata, _ := json.Marshal(updatemember)
-	// fmt.Printf("updatemember --> %+v \n", updatemember)
-
-	// req, err = http.NewRequest("PUT", updateURL, bytes.NewBuffer(addmemberdata))
-	// if err != nil {
-	// 	errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
-	// }
-	// req.Header.Add("Content-Type", "application/json")
-	// req.Header.Add("Authorization", token)
-	// client = &http.Client{}
-	// _, err = client.Do(req)
-	// if err != nil {
-	// 	errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
-	// }
-
-	errors.InfoHandler(c, "groups added to member successfully", "groups added to member successfully", http.StatusNoContent)
+	errors.InfoHandler(c, "assign groups completed"+withOutput, response, resp.StatusCode)
 }
 
+// UnassignGroups	godoc
+//
+//	@Summary		Unassign thing from one or more groups
+//	@Description	Unassign thing from one or more groups.
+//	@Tags			things
+//	@Produce		json
+//
+//	@Param			id		path	string					true	"Unique thing id."
+//	@Param			Request	body	models.AssignGroupReq	true	"JSON-formatted document describing group IDs."
+//
+//	@Success		204		"Group(s) unassigned."
+//	@Failure		400		"Failed due to malformed JSON."
+//	@Failure		401		"Missing or invalid access token provided."
+//	@Failure		500		"Unexpected server-side error occurred."
+//
+//	@Security		BearerAuth
+//
+//	@Router			/things/{id}/groups [delete]
 func UnassignGroups(c *gin.Context) {
 	path := strings.SplitAfter(c.Request.URL.Path, "/api/")
 	grouptype := strings.Split(path[1], "/")[0]
@@ -716,36 +836,20 @@ func UnassignGroups(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
-	if (resp.StatusCode != 200) && (resp.StatusCode != 204) {
-		errors.ErrHandler(c, fmt.Errorf(`group could not be removed from the member`), http.StatusBadRequest)
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		errors.ErrHandler(c, fmt.Errorf("error occurred while reading response : %v", err), http.StatusBadRequest)
 		return
 	}
+	var response models.RespError
+	_ = json.Unmarshal(data, &response)
 
-	// var updateURL string
-	// if groups.Type == "things" {
-	// 	updateURL = env.Env(envThingURL, sdkThingURL)
-	// 	updateURL = updateURL + "/things/" + Item.Id
-	// } else if groups.Type == "users" {
-	// 	updateURL = env.Env(envUserURL, sdkUserURL)
-	// 	updateURL = updateURL + "/users/" + Item.Id
-	// }
+	var withOutput string
+	if response.Error != "" {
+		withOutput = " with errors - " + response.Error
+	} else {
+		withOutput = " without errors."
+	}
 
-	// var updatemember models.ThingReq
-	// updatemember.Metadata = make(map[string]interface{}, 1)
-	// updatemember.Metadata["removegroup"] = groups.Groups
-	// addmemberdata, _ := json.Marshal(updatemember)
-
-	// req, err = http.NewRequest("PUT", updateURL, bytes.NewBuffer(addmemberdata))
-	// if err != nil {
-	// 	errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), http.StatusInternalServerError)
-	// }
-	// req.Header.Add("Content-Type", "application/json")
-	// req.Header.Add("Authorization", token)
-	// client = &http.Client{}
-	// resp, err = client.Do(req)
-	// if err != nil {
-	// 	errors.ErrHandler(c, fmt.Errorf("request could not be processed by server : %v", err), resp.StatusCode)
-	// }
-
-	errors.InfoHandler(c, "groups removed from member successfully", "groups removed from member successfully", http.StatusNoContent)
+	errors.InfoHandler(c, "unassign groups completed"+withOutput, response, resp.StatusCode)
 }
