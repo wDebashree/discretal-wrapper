@@ -23,7 +23,7 @@ func GetHealth(c *gin.Context) {
 	fmt.Println("thingsurl: ", thingsurl)
 
 	// This will fail because requiring "authorization key"
-	resp, err := httpReq(c, "GET", thingsurl, nil)
+	resp, err := httpReq(c, "GET", thingsurl, nil, nil)
 	if err != nil {
 		fmt.Println("err =", err)
 		c.Status(http.StatusInternalServerError)
@@ -37,7 +37,7 @@ func GetHealth(c *gin.Context) {
 	fmt.Println("usersurl: ", usersurl)
 
 	// This will fail because requiring "authorization key"
-	resp, err = httpReq(c, "GET", usersurl, nil)
+	resp, err = httpReq(c, "GET", usersurl, nil, nil)
 	if err != nil || resp.StatusCode != 200 {
 		fmt.Println("2: status = ", resp.StatusCode)
 		c.Status(http.StatusInternalServerError)

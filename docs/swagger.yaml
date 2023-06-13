@@ -1,5 +1,133 @@
 basePath: /api
 definitions:
+  controllers.CreateGroup.Resp:
+    properties:
+      id:
+        type: string
+    type: object
+  controllers.GetConnectedChannels.ConnChannels:
+    properties:
+      channels:
+        items:
+          $ref: '#/definitions/models.ChannelRes'
+        type: array
+      direction:
+        type: string
+      limit:
+        type: integer
+      offset:
+        type: integer
+      order:
+        type: string
+      total:
+        type: integer
+    type: object
+  controllers.GetConnectedGroups.SuccessResponse:
+    properties:
+      groups:
+        items:
+          $ref: '#/definitions/models.ViewGroupRes'
+        type: array
+      level:
+        type: integer
+      limit:
+        type: integer
+      name:
+        type: string
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  controllers.GetConnectedThings.ConnThings:
+    properties:
+      direction:
+        type: string
+      limit:
+        type: integer
+      offset:
+        type: integer
+      order:
+        type: string
+      things:
+        items:
+          $ref: '#/definitions/models.ThingRes'
+        type: array
+      total:
+        type: integer
+    type: object
+  controllers.GetMembers.memberPageRes:
+    properties:
+      level:
+        type: integer
+      limit:
+        type: integer
+      members:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      offset:
+        type: integer
+      total:
+        type: integer
+      type:
+        type: string
+    type: object
+  controllers.GetMessages.ResMessages:
+    properties:
+      format:
+        description: |-
+          Subtopic    string    `json:"subtopic,omitempty"`
+          Publisher   string    `json:"publisher,omitempty"`
+          Protocol    string    `json:"protocol,omitempty"`
+          Name        string    `json:"name,omitempty"`
+          Value       float64   `json:"v,omitempty"`
+          Comparator  string    `json:"comparator,omitempty"`
+          BoolValue   bool      `json:"vb,omitempty"`
+          StringValue string    `json:"vs,omitempty"`
+          DataValue   string    `json:"vd,omitempty"`
+          From        float64   `json:"from,omitempty"`
+          To          float64   `json:"to,omitempty"`
+        type: string
+      limit:
+        type: integer
+      messages:
+        items: {}
+        type: array
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  controllers.SendMessages.Msg:
+    additionalProperties: true
+    type: object
+  models.AssignGroupReq:
+    properties:
+      groups:
+        items:
+          type: string
+        type: array
+      type:
+        description: Type   string   `json:"type,omitempty" binding:"required"`
+        type: string
+    required:
+    - groups
+    type: object
+  models.AssignReq:
+    properties:
+      members:
+        items:
+          type: string
+        type: array
+      type:
+        type: string
+    required:
+    - members
+    - type
+    type: object
   models.ChannelReq:
     properties:
       metadata:
@@ -21,12 +149,89 @@ definitions:
         example: channel1
         type: string
     type: object
+  models.ChannelResAll:
+    properties:
+      id:
+        example: 880d7429-8857-4e50-a7e0-698e2865b0aa
+        type: string
+      metadata:
+        $ref: '#/definitions/models.Metadata'
+      name:
+        example: channel1
+        type: string
+      owner:
+        example: user@example.com
+        type: string
+    type: object
   models.ChannelsList:
     properties:
       channels:
         items:
-          $ref: '#/definitions/models.ChannelRes'
+          $ref: '#/definitions/models.ChannelResAll'
         type: array
+    type: object
+  models.GroupPageRes:
+    properties:
+      groups:
+        items:
+          $ref: '#/definitions/models.GroupRes'
+        type: array
+      level:
+        type: integer
+      limit:
+        type: integer
+      name:
+        type: string
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  models.GroupReq:
+    properties:
+      description:
+        example: group1
+        type: string
+      metadata:
+        $ref: '#/definitions/models.Metadata'
+      name:
+        example: group1
+        type: string
+    required:
+    - name
+    type: object
+  models.GroupRes:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/models.GroupRes'
+        type: array
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      level:
+        description: Indicates a level in tree hierarchy from first group node - root.
+        type: integer
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      owner_id:
+        type: string
+      parent_id:
+        type: string
+      path:
+        description: |-
+          Path in a tree consisting of group ids
+          parentID1.parentID2.childID1
+          e.g. 01EXPM5Z8HRGFAEWTETR1X1441.01EXPKW2TVK74S5NWQ979VJ4PJ.01EXPKW2TVK74S5NWQ979VJ4PJ
+        type: string
+      updated_at:
+        type: string
     type: object
   models.LoginUserReq:
     properties:
@@ -54,13 +259,19 @@ definitions:
       email:
         example: user1@example.com
         type: string
-      metadata:
-        $ref: '#/definitions/models.Metadata'
+      firstName:
+        example: John Doe
+        type: string
+      lastName:
+        example: John Doe
+        type: string
       password:
         example: pass@1234
         type: string
     required:
     - email
+    - firstName
+    - lastName
     - password
     type: object
   models.RegisterUserRes:
@@ -72,6 +283,9 @@ definitions:
     type: object
   models.ThingReq:
     properties:
+      coordinates:
+        additionalProperties: true
+        type: object
       metadata:
         $ref: '#/definitions/models.Metadata'
       name:
@@ -94,14 +308,54 @@ definitions:
         example: device1
         type: string
     type: object
-  models.ThingsList:
+  models.ThingResAll:
     properties:
+      groups:
+        items:
+          type: string
+        type: array
+      id:
+        example: 8c0c7129-8857-4e50-a7e0-698e2865b0aa
+        type: string
+      key:
+        example: ef751d71-fb43-423c-a2eb-8602e6232cb4
+        type: string
+      metadata:
+        $ref: '#/definitions/models.Metadata'
+      name:
+        example: device1
+        type: string
+      owner:
+        example: user@example.com
+        type: string
+    type: object
+  models.ThingsPageRes:
+    properties:
+      dir:
+        type: string
+      isadmin:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      order:
+        type: string
       things:
         items:
-          $ref: '#/definitions/models.ThingRes'
+          $ref: '#/definitions/models.ThingResAll'
         type: array
+      total:
+        type: integer
     type: object
-host: localhost:5000
+  models.ViewGroupRes:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+host: iot.discretal.com
 info:
   contact: {}
   description: A wrapper api for utilizing Discretal server messaging services over
@@ -117,16 +371,34 @@ paths:
         is consumed either by making subsequent requests, or by increasing the subset
         size of the initial request.
       parameters:
-      - default: 100
-        description: Size of the subset to retrieve.
+      - description: Size of the subset to retrieve.
         in: query
         name: limit
         type: integer
-      - default: 0
-        description: Number of items to skip during retrieval.
+      - description: Number of items to skip during retrieval.
         in: query
         name: offset
         type: integer
+      - description: Unique channel name.
+        in: query
+        name: name
+        type: string
+      - description: Entity to be sorted on.
+        in: query
+        name: order
+        type: string
+      - description: Asc or Desc sorting.
+        in: query
+        name: dir
+        type: string
+      - description: Disconnected true or false.
+        in: query
+        name: disconnected
+        type: boolean
+      - description: Email ID of selected user.
+        in: query
+        name: email
+        type: string
       produces:
       - application/json
       responses:
@@ -173,38 +445,38 @@ paths:
       summary: Adds new channel
       tags:
       - channels
-  /channels/{name}:
+  /channels/{id}:
     delete:
-      description: Removes a channel. The service will ensure that the subscribed
-        apps and things are unsubscribed from the removed channel.
+      description: Removes a group. The service will ensure that the subscribed group
+        relation is deleted as well.
       parameters:
-      - description: Unique channel name.
+      - description: Unique group id.
         in: path
-        name: name
+        name: id
         required: true
         type: string
       produces:
       - application/json
       responses:
         "204":
-          description: Channel removed.
+          description: Group removed.
         "400":
-          description: Failed due to malformed channel's ID.
+          description: Failed due to malformed group's ID.
         "401":
           description: Missing or invalid access token provided.
         "500":
           description: Unexpected server-side error occurred.
       security:
       - BearerAuth: []
-      summary: Removes a channel
+      summary: Removes a group
       tags:
-      - channels
+      - groups
     get:
       description: Retrieves the details of a channel
       parameters:
-      - description: Unique channel name.
+      - description: Unique channel id.
         in: path
-        name: name
+        name: id
         required: true
         type: string
       produces:
@@ -227,6 +499,321 @@ paths:
       summary: Retrieves channel info
       tags:
       - channels
+  /channels/{id}/messages:
+    get:
+      description: Retrieves messages passed over a channel.
+      parameters:
+      - description: Unique channel id.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Size of the subset to retrieve.
+        in: query
+        name: limit
+        type: integer
+      - description: Number of items to skip during retrieval.
+        in: query
+        name: offset
+        type: integer
+      - description: Select the messages based on the set publisher.
+        in: query
+        name: publisher
+        type: string
+      - description: Select the messages based on the set protocol.
+        in: query
+        name: protocol
+        type: string
+      - description: Select the messages based on the set name.
+        in: query
+        name: name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/controllers.GetMessages.ResMessages'
+        "400":
+          description: Failed due to malformed query parameters.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves messages passed over a channel.
+      tags:
+      - messages
+    post:
+      description: Sends messages over a channel.
+      parameters:
+      - description: Unique channel id.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: JSON-formatted document describing the messages.
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.SendMessages.Msg'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Messages sent.
+        "400":
+          description: Failed due to malformed query parameters.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Sends messages over a channel.
+      tags:
+      - messages
+  /channels/{id}/things:
+    get:
+      description: Retrieves a list of things that are connected to the channel. Due
+        to performance concerns, data is retrieved in subsets.
+      parameters:
+      - description: Unique channel id.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Size of the subset to retrieve.
+        in: query
+        name: limit
+        type: integer
+      - description: Number of items to skip during retrieval.
+        in: query
+        name: offset
+        type: integer
+      - description: Entity to be sorted on.
+        in: query
+        name: order
+        type: string
+      - description: Asc or Desc sorting.
+        in: query
+        name: dir
+        type: string
+      - description: Disconnected true or false.
+        in: query
+        name: disconnected
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/controllers.GetConnectedThings.ConnThings'
+        "400":
+          description: Failed due to malformed query parameters.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves connected things
+      tags:
+      - channels
+  /groups:
+    get:
+      description: Retrieves a list of groups. Due to performance concerns, data is
+        retrieved in subsets. The API things must ensure that the entire dataset is
+        consumed either by making subsequent requests, or by increasing the subset
+        size of the initial request.
+      parameters:
+      - description: Size of the subset to retrieve.
+        in: query
+        name: limit
+        type: integer
+      - description: Number of items to skip during retrieval.
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/models.GroupPageRes'
+        "400":
+          description: Failed due to malformed query parameters.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves groups
+      tags:
+      - groups
+    post:
+      description: Adds new group that will be owned by user identified using the
+        provided access token.
+      parameters:
+      - description: JSON-formatted document describing the new group.
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/models.GroupReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Group created.
+          schema:
+            $ref: '#/definitions/controllers.CreateGroup.Resp'
+        "400":
+          description: Failed due to malformed JSON.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Adds new group
+      tags:
+      - groups
+  /groups/{groupID}/members:
+    delete:
+      description: Remove one or more things from the group.
+      parameters:
+      - description: Unique group id.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: JSON-formatted document describing group IDs.
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/models.AssignReq'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Group(s) unassigned.
+        "400":
+          description: Failed due to malformed JSON.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Remove one or more things from the group.
+      tags:
+      - groups
+    get:
+      description: Retrieves a list of members which belong to the group.
+      parameters:
+      - description: Unique thing id.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Size of the subset to retrieve.
+        in: query
+        name: limit
+        type: integer
+      - description: Number of items to skip during retrieval.
+        in: query
+        name: offset
+        type: integer
+      - description: Member is of type users or things.
+        in: query
+        name: type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/controllers.GetMembers.memberPageRes'
+        "400":
+          description: Failed due to malformed query parameters.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves connected members
+      tags:
+      - groups
+    post:
+      description: Assign one or more things to the group.
+      parameters:
+      - description: Unique group id.
+        in: path
+        name: groupID
+        required: true
+        type: string
+      - description: JSON-formatted document describing group IDs.
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/models.AssignReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Member(s) assigned.
+        "400":
+          description: Failed due to malformed JSON.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Assign one or more things to the group.
+      tags:
+      - groups
+  /groups/{id}:
+    get:
+      description: Retrieves the details of a group
+      parameters:
+      - description: Unique group id.
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/models.GroupRes'
+        "400":
+          description: Failed due to malformed group's ID.
+        "401":
+          description: Missing or invalid access token provided.
+        "404":
+          description: Group does not exist.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves group info
+      tags:
+      - groups
   /login:
     post:
       description: Generates an access token when provided with proper credentials.
@@ -283,23 +870,45 @@ paths:
         consumed either by making subsequent requests, or by increasing the subset
         size of the initial request.
       parameters:
-      - default: 100
-        description: Size of the subset to retrieve.
+      - description: Size of the subset to retrieve.
         in: query
         name: limit
         type: integer
-      - default: 0
-        description: Number of items to skip during retrieval.
+      - description: Number of items to skip during retrieval.
         in: query
         name: offset
         type: integer
+      - description: Unique thing name.
+        in: query
+        name: name
+        type: string
+      - description: Entity to be sorted on.
+        in: query
+        name: order
+        type: string
+      - description: Asc or Desc sorting.
+        in: query
+        name: dir
+        type: string
+      - description: Disconnected true or false.
+        in: query
+        name: disconnected
+        type: boolean
+      - description: Email ID of selected user.
+        in: query
+        name: email
+        type: string
+      - description: Array of group IDs.
+        in: query
+        name: gids
+        type: array
       produces:
       - application/json
       responses:
         "200":
           description: Data retrieved.
           schema:
-            $ref: '#/definitions/models.ThingsList'
+            $ref: '#/definitions/models.ThingsPageRes'
         "400":
           description: Failed due to malformed query parameters.
         "401":
@@ -339,14 +948,14 @@ paths:
       summary: Adds new thing
       tags:
       - things
-  /things/{name}:
+  /things/{id}:
     delete:
       description: Removes a thing. The service will ensure that the removed thing
         is disconnected from all of the existing channels.
       parameters:
-      - description: Unique thing name.
+      - description: Unique thing id.
         in: path
-        name: name
+        name: id
         required: true
         type: string
       produces:
@@ -368,9 +977,9 @@ paths:
     get:
       description: Retrieves the details of a thing
       parameters:
-      - description: Unique thing name.
+      - description: Unique thing id.
         in: path
-        name: name
+        name: id
         required: true
         type: string
       produces:
@@ -393,8 +1002,195 @@ paths:
       summary: Retrieves thing info
       tags:
       - things
+    put:
+      description: Updates the details of a thing
+      parameters:
+      - description: Unique thing id.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: JSON-formatted document describing the updated thing.
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ThingReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Thing updated.
+        "400":
+          description: Failed due to malformed thing's ID.
+        "401":
+          description: Missing or invalid access token provided.
+        "404":
+          description: Thing does not exist.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Updates thing info
+      tags:
+      - things
+  /things/{id}/channels:
+    get:
+      description: Retrieves a list of channels that are connected to the thing. Due
+        to performance concerns, data is retrieved in subsets.
+      parameters:
+      - description: Unique thing id.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Size of the subset to retrieve.
+        in: query
+        name: limit
+        type: integer
+      - description: Number of items to skip during retrieval.
+        in: query
+        name: offset
+        type: integer
+      - description: Entity to be sorted on.
+        in: query
+        name: order
+        type: string
+      - description: Asc or Desc sorting.
+        in: query
+        name: dir
+        type: string
+      - description: Disconnected true or false.
+        in: query
+        name: disconnected
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/controllers.GetConnectedChannels.ConnChannels'
+        "400":
+          description: Failed due to malformed query parameters.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves connected channels
+      tags:
+      - things
+  /things/{id}/groups:
+    delete:
+      description: Unassign thing from one or more groups.
+      parameters:
+      - description: Unique thing id.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: JSON-formatted document describing group IDs.
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/models.AssignGroupReq'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Group(s) unassigned.
+        "400":
+          description: Failed due to malformed JSON.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Unassign thing from one or more groups
+      tags:
+      - things
+    get:
+      description: Retrieves a list of groups to which the thing is a member.
+      parameters:
+      - description: Unique thing id.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Size of the subset to retrieve.
+        in: query
+        name: limit
+        type: integer
+      - description: Number of items to skip during retrieval.
+        in: query
+        name: offset
+        type: integer
+      - description: Entity to be sorted on.
+        in: query
+        name: order
+        type: string
+      - description: Asc or Desc sorting.
+        in: query
+        name: dir
+        type: string
+      - description: Disconnected true or false.
+        in: query
+        name: disconnected
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data retrieved.
+          schema:
+            $ref: '#/definitions/controllers.GetConnectedGroups.SuccessResponse'
+        "400":
+          description: Failed due to malformed query parameters.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Retrieves connected groups
+      tags:
+      - things
+    post:
+      description: Assign thing to one or more groups.
+      parameters:
+      - description: Unique thing id.
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: JSON-formatted document describing group IDs.
+        in: body
+        name: Request
+        required: true
+        schema:
+          $ref: '#/definitions/models.AssignGroupReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Group(s) assigned.
+        "400":
+          description: Failed due to malformed JSON.
+        "401":
+          description: Missing or invalid access token provided.
+        "500":
+          description: Unexpected server-side error occurred.
+      security:
+      - BearerAuth: []
+      summary: Assign thing to one or more groups
+      tags:
+      - things
 schemes:
-- http
+- https
 securityDefinitions:
   BearerAuth:
     in: header

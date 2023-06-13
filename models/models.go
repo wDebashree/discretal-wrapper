@@ -4,6 +4,12 @@ import (
 	"time"
 )
 
+type User struct {
+	ID       string                 `json:"id"`
+	Email    string                 `json:"email"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
+
 type Connect struct {
 	Channel_ids []string
 	Thing_ids   []string
@@ -31,8 +37,9 @@ type LoginUserRes struct {
 }
 
 type ThingReq struct {
-	Name     string   `json:"name" binding:"required" example:"device1"`
-	Metadata Metadata `json:"metadata,omitempty"`
+	Name        string                 `json:"name" binding:"required" example:"device1"`
+	Coordinates map[string]interface{} `json:"coordinates"`
+	Metadata    Metadata               `json:"metadata,omitempty"`
 }
 
 type ThingRes struct {
@@ -47,6 +54,7 @@ type ThingResAll struct {
 	Owner    string   `json:"owner" example:"user@example.com"`
 	ID       string   `json:"id" example:"8c0c7129-8857-4e50-a7e0-698e2865b0aa"`
 	Key      string   `json:"key" example:"ef751d71-fb43-423c-a2eb-8602e6232cb4"`
+	Groups   []string `json:"groups,omitempty"`
 	Metadata Metadata `json:"metadata,omitempty"`
 }
 
@@ -85,7 +93,7 @@ type ItemId struct {
 
 type GroupReq struct {
 	Name        string   `json:"name" binding:"required" example:"group1"`
-	Description string   `json:"description" example:"channel1"`
+	Description string   `json:"description" example:"group1"`
 	Metadata    Metadata `json:"metadata,omitempty"`
 }
 
@@ -126,7 +134,7 @@ type GroupRes struct {
 	UpdatedAt time.Time   `json:"updated_at"`
 }
 
-type grpPageRes struct {
+type GrpPageRes struct {
 	Limit  uint64 `json:"limit,omitempty"`
 	Offset uint64 `json:"offset,omitempty"`
 	Total  uint64 `json:"total"`
@@ -134,8 +142,12 @@ type grpPageRes struct {
 	Name   string `json:"name"`
 }
 type GroupPageRes struct {
-	grpPageRes
+	GrpPageRes
 	Groups []GroupRes `json:"groups"`
+}
+type ViewGroupRes struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type GroupId struct {
@@ -153,6 +165,60 @@ type AssignGroupReq struct {
 	Groups []string `json:"groups" binding:"required"`
 }
 
+type Message interface{}
+
 type RespError struct {
-	Error string `json:"error"`
+	Error string `json:"error,omitempty"`
+}
+
+type AddMapReq struct {
+	ThingID     string   `json:"thing_id" binding:"required"`
+	Coordinates Metadata `json:"coordinates" binding:"required"`
+}
+
+type pageRes struct {
+	Total  uint64 `json:"total"`
+	Offset uint64 `json:"offset"`
+	Limit  uint64 `json:"limit"`
+	Order  string `json:"order"`
+	Dir    string `json:"direction"`
+}
+type ViewMapRes struct {
+	ThingID     string                 `json:"thing_id"`
+	Coordinates map[string]interface{} `json:"coordinates"`
+	Status      bool                   `json:"status"`
+	LastOnline  string                 `json:"lastOnline"`
+	Owner       string                 `json:"owner"`
+	Name        string                 `json:"name"`
+	Key         string                 `json:"key"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+}
+type MapsPageRes struct {
+	pageRes
+	Maps []ViewMapRes `json:"maps"`
+}
+
+type UpdateMapReq struct {
+	Coordinates Metadata `json:"coordinates" binding:"required"`
+}
+
+type LastSentTime struct {
+	LatestTimes map[string]float64 `json:"lastSentTime"`
+}
+
+type thingsPageRes struct {
+	Total     uint64 `json:"total"`
+	Offset    uint64 `json:"offset"`
+	Limit     uint64 `json:"limit"`
+	Order     string `json:"order,omitempty"`
+	Direction string `json:"dir,omitempty"`
+	IsAdmin   bool   `json:"isadmin,omitempty"`
+}
+type ThingsPageRes struct {
+	thingsPageRes
+	Things []ThingResAll `json:"things"`
+}
+
+type GroupIDs struct {
+	IDs []string `json:"group_ids"`
 }
